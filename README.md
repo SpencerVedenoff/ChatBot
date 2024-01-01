@@ -6,4 +6,4 @@
 - *To install NumPy run the following command from terminal:*
         pip install numpy
 
-- Please reach out if you have anyquestions!
+- Please reach out if you have any questions!
