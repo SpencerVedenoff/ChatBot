@@ -3,7 +3,7 @@
 - *To install PyTorch run the following command from terminal:*
         pip install torch
 
-- * To install NumPy run the following command from terminal:*
+- *To install NumPy run the following command from terminal:*
         pip install numpy
 
 - Please reach out if you have anyquestions!
