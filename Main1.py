@@ -1,6 +1,16 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import random
+import string
+
+# Example usage
+hidden_size = 256
+input_size = 1000  # Replace 1000 with the actual vocabulary size
+output_size = 1000  # Replace 1000 with the actual vocabulary size
+MAX_LENGTH = 10
+SOS_token = 0
+EOS_token = 1
 
 # Define the Encoder and Decoder models
 class Encoder(nn.Module):
@@ -20,21 +30,6 @@ class Decoder(nn.Module):
     def __init__(self, hidden_size, output_size):
         super(Decoder, self).__init__()
         self.hidden_size = hidden_size  # Store hidden_size as an attribute
-        self.embedding = nn.Embedding(output_size, hidden_size)
-        self.gru = nn.GRU(hidden_size, hidden_size)
-        self.out = nn.Linear(hidden_size, output_size)
-        self.softmax = nn.LogSoftmax(dim=1)
-
-    def forward(self, input, hidden):
-        output = self.embedding(input).view(1, 1, -1)
-        output = nn.functional.relu(output)
-        output, hidden = self.gru(output, hidden)
-        output = self.softmax(self.out(output[0]))
-        return output, hidden
-
-class Decoder(nn.Module):
-    def __init__(self, hidden_size, output_size):
-        super(Decoder, self).__init__()
         self.embedding = nn.Embedding(output_size, hidden_size)
         self.gru = nn.GRU(hidden_size, hidden_size)
         self.out = nn.Linear(hidden_size, output_size)
@@ -86,6 +81,14 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
 
     return loss.item() / target_length
 
+
+# Populate vocabulary by adding each sentence in pairs
+pairs = [
+    ("How are you", "I am fine"),
+    ("Hello", "Hi there"),
+    # Add more pairs here
+]
+
 # Function to train the chatbot
 def train_chatbot(encoder, decoder, n_iters, print_every=1000, plot_every=100, learning_rate=0.01):
     optimizer_encoder = optim.SGD(encoder.parameters(), lr=learning_rate)
@@ -99,15 +102,6 @@ def train_chatbot(encoder, decoder, n_iters, print_every=1000, plot_every=100, l
         if iter % print_every == 0:
             print(f"Iteration {iter}, Loss: {loss}")
 
-import random
-
-# Example list of sentence pairs for training
-pairs = [
-    ("How are you", "I am fine"),
-    ("Hello", "Hi there"),
-    # Add more pairs here based on your dataset
-]
-
 def random_training_pair():
     # Select a random pair from the dataset
     pair = random.choice(pairs)
@@ -117,11 +111,14 @@ def random_training_pair():
 
 
 # Function to evaluate the chatbot
-def evaluate(encoder, decoder, sentence, max_length = max):
+def evaluate(encoder, decoder, sentence, max_length = MAX_LENGTH):
     with torch.no_grad():
+        # Preprocess the input sentence to match vocabulary words
+        sentence = preprocess_sentence(sentence)
         input_tensor = tensorFromSentence(input_lang, sentence)
         input_length = input_tensor.size()[0]
         encoder_hidden = torch.zeros(1, 1, hidden_size)
+
         encoder_outputs = torch.zeros(max_length, encoder.hidden_size)
 
         for ei in range(input_length):
@@ -146,11 +143,22 @@ def evaluate(encoder, decoder, sentence, max_length = max):
             decoder_input = topi.squeeze().detach()
 
         return decoded_words
+
+
+def preprocess_sentence(sentence):
+    # Convert to lowercase and remove punctuation
+    sentence = sentence.lower()
+    sentence = sentence.translate(str.maketrans('', '', string.punctuation))
+    return sentence
+
+
     
 def tensorFromSentence(lang, sentence):
+    sentence = preprocess_sentence(sentence)  # Lowercase the sentence here
     indexes = [lang.word2index[word] for word in sentence.split(' ')]
-    indexes.append(EOS_token)  # Add EOS token to the end of the sentence
+    indexes.append(EOS_token)
     return torch.tensor(indexes, dtype=torch.long).view(-1, 1)
+
     
 class Language:
     def __init__(self, name):
@@ -170,29 +178,20 @@ class Language:
             self.n_words += 1
 
 
-
-# Example usage
-hidden_size = 256
-input_size = 1000  # Replace 1000 with the actual vocabulary size
-output_size = 1000  # Replace 1000 with the actual vocabulary size
-MAX_LENGTH = 10
-SOS_token = 0
-EOS_token = 1
-
 # Define your language objects
 input_lang = Language("English")
 output_lang = Language("English")
 
-# Populate vocabulary by adding each sentence in pairs
-pairs = [
-    ("How are you", "I am fine"),
-    ("Hello", "Hi there"),
-    # Add more pairs here
-]
 
+# Populate vocabulary by adding each sentence in lowercase
 for pair in pairs:
-    input_lang.add_sentence(pair[0])
-    output_lang.add_sentence(pair[1])
+    input_lang.add_sentence(preprocess_sentence(pair[0]))
+    output_lang.add_sentence(preprocess_sentence(pair[1]))
+
+
+# Check the vocabulary content to confirm all words were added
+print("Input Language Vocabulary:", input_lang.word2index)
+
 
 # Now set input_size and output_size
 input_size = input_lang.n_words
@@ -210,7 +209,7 @@ train_chatbot(encoder, decoder, n_iters=10000, print_every=1000)
 sentence = "How are you?"
 output_words = evaluate(encoder, decoder, sentence)
 output_sentence = ' '.join(output_words)
-# print(f"Input: {sentence}")
-# print(f"Output: {output_sentence}")
+print(f"Input: {sentence}")
+print(f"Output: {output_sentence}")
 print("Input Language Vocabulary:", input_lang.word2index)
 print("Output Language Vocabulary:", output_lang.word2index)
